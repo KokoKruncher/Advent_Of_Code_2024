@@ -12,30 +12,32 @@ fprintf("Checksum: %i \n",checksum)
 
 
 function blocks = decodeDiskMap(diskMap)
+% don't join the blocks into single string as fileIDs could have multiple digits!
+
 diskMap = splitStringIntoArray(diskMap);
 diskMap = str2double(diskMap);
 
 nDiskMapElements = numel(diskMap);
-blocks = strings(size(diskMap));
+blocks = cell(size(diskMap));
 
 % handle files
 fileId = 0;
 for i = 1:2:nDiskMapElements
     nBlocksThisFile = diskMap(i);
-    blocksThisFile = repelem(string(fileId),1,nBlocksThisFile);
-    blocks(i) = join(blocksThisFile,"");
+    blocks{i} = repelem(string(fileId),1,nBlocksThisFile);
     fileId = fileId + 1;
 end
 
 % handle free spaces
 for i = 2:2:nDiskMapElements
     nBlocksThisFreeSpace = diskMap(i);
-    blocksThisFreeSpace = repelem(".",1,nBlocksThisFreeSpace);
-    blocks(i) = join(blocksThisFreeSpace,"");
+    blocks{i} = repelem(".",1,nBlocksThisFreeSpace);
 end
 
-blocks(ismissing(blocks)) = [];
-blocks = join(blocks,"");
+indxEmptyStrings = cellfun(@isempty,blocks);
+blocks(indxEmptyStrings) = [];
+
+blocks = [blocks{:}];
 end
 
 
@@ -49,8 +51,6 @@ end
 
 
 function blocks = compactBlocks(blocks)
-blocks = splitStringIntoArray(blocks);
-
 locLastFileBlock = find(blocks ~= ".",1,"last");
 locFirstFreeSpaceBlock = find(blocks == ".",1,"first");
 
