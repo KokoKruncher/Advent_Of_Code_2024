@@ -1,9 +1,10 @@
 clear; clc;
+% 0.02s runtime excluding loading the data
 
 filename = "D10 Data.txt";
 data = readlines(filename);
 
-%% Part 1
+%% Part 1 & Part 2
 tic
 topographicMap = splitAndConvertMap(data);
 trailHeadLinearIndx = find(topographicMap == 0);
