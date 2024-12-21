@@ -4,18 +4,14 @@ clear; clc;
 filename = "D7 Data.txt";
 data = readlines(filename);
 tic
-% setup parallel pool for brute forcing this shit
-nWorkers = 12;
-if isempty(gcp('nocreate'))
-    parpool(nWorkers);
-end
 
 [testValueArray,testNumbersArray] = formatData(data);
 
-allowedOperators = ["*" "+"];
+% 1: ||, 2: +, 3: *
+allowedOperators = [2 3];
 bSuccess = false(size(testValueArray));
 nTestValues = numel(testValueArray);
-parfor (iTestValue = 1:nTestValues,nWorkers)
+for iTestValue = 1:nTestValues
     testValue = testValueArray(iTestValue);
     testNumbers = testNumbersArray{iTestValue};
     nTestNumbers = numel(testNumbers);
@@ -45,12 +41,12 @@ fprintf("Total calibration results: %i\n", totalCalibrationResult)
 newTestValueArray = testValueArray(~bSuccess);
 newTestNumbersArray = testNumbersArray(~bSuccess);
 
-% mpiprofile on
 tic
-newAllowedOperators = ["||" "*" "+"];
+% 1: ||, 2: +, 3: *
+newAllowedOperators = [1 2 3];
 new_bSuccess = false(size(newTestValueArray));
 nTestValues = numel(newTestValueArray);
-parfor (iTestValue = 1:nTestValues,nWorkers)
+for iTestValue = 1:nTestValues
     testValue = newTestValueArray(iTestValue);
     testNumbers = newTestNumbersArray{iTestValue};
     nTestNumbers = numel(testNumbers);
@@ -60,7 +56,7 @@ parfor (iTestValue = 1:nTestValues,nWorkers)
 
     % since permutations without "||" were already tested, only test
     % permutations with "||"
-    indxContainsConcat = any(contains(operatorPermutations,"||"),2);
+    indxContainsConcat = any(operatorPermutations == 1,2);
     operatorPermutations = operatorPermutations(indxContainsConcat,:);
 
     nPermutations = height(operatorPermutations);
@@ -74,8 +70,6 @@ parfor (iTestValue = 1:nTestValues,nWorkers)
     end
 end
 toc
-% delete(gcp('nocreate'))
-% mpiprofile viewer
 
 newSuccessfulCalibrationResults = newTestValueArray(new_bSuccess);
 newTotalCalibrationResult = sum(newSuccessfulCalibrationResults,'all') + ...
@@ -134,7 +128,7 @@ function evaluatedExpression = evaluateCustomOperators(testNumbers,operators,tes
 % operator "||" which concatenates two numbers into one
 arguments
     testNumbers (1,:) double
-    operators (1,:) string
+    operators (1,:) double
     testValue (1,1) double
 end
 % testNumbers = str2double(testNumbers);
@@ -145,17 +139,18 @@ for iOperator = 1:nOperators
     nextNumber = testNumbers(iOperator + 1);
 
     % performance bottleneck is extracting string from string array, changing operators to
-    % be represented by numbers would be faster.
+    % be represented by numbers is faster here.
     currentOperator = operators(iOperator);
     
     % if-else in this case ~20x faster than switch-case
-    if currentOperator == "||"
+    % 1: ||, 2: +, 3: *
+    if currentOperator == 1
         % concatenate numbers
         nDigitsToAdd = floor(log10(nextNumber))+1;
         currentValue = currentValue*(10^nDigitsToAdd) + nextNumber;
-    elseif currentOperator == "+"
+    elseif currentOperator == 2
         currentValue = currentValue + nextNumber;
-    elseif currentOperator == "*"
+    elseif currentOperator == 3
         currentValue = currentValue*nextNumber;
     else
         error("Unknown operator: %s",currentOperator)
