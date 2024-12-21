@@ -131,7 +131,6 @@ arguments
     operators (1,:) double
     testValue (1,1) double
 end
-% testNumbers = str2double(testNumbers);
 
 nOperators = numel(operators);
 currentValue = testNumbers(1);
