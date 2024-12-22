@@ -78,19 +78,15 @@ nMaxPossibleWindowsPerRow = (nCols - windowLength + 1);
 for iRow = 1:nRows
     row = priceChanges(iRow,:);
 
-    windowsAlreadyChecked = dictionary({nan},true);
-    for iCol = 1:nMaxPossibleWindowsPerRow
-        window = row(iCol:(iCol + windowLength - 1));
-
-        if windowsAlreadyChecked.isKey({window})
-            continue
-        end
-        windowsAlreadyChecked({window}) = true;
-
+    [windows,iCol] = createWindows(row,windowLength,nMaxPossibleWindowsPerRow);
+    nWindows = height(windows);
+    for iWindow = 1:nWindows
+        window = windows(iWindow,:);
+        
         % iCol + window length - 1 is col of last window element.
         % + 1 because first column of price matrix doesnt have a corresponding price
         % change.
-        thisPrice = prices(iRow,iCol + windowLength - 1 + 1);
+        thisPrice = prices(iRow,iCol(iWindow) + windowLength - 1 + 1);
 
         if windowScore.isKey({window})
             windowScore({window}) = windowScore({window}) + thisPrice;
@@ -99,4 +95,15 @@ for iRow = 1:nRows
         end
     end
 end
+end
+
+
+
+function [windows,iCol] = createWindows(vec,windowLength,nMaxPossibleWindowsPerRow)
+windows = nan(nMaxPossibleWindowsPerRow,windowLength);
+
+for i = 1:nMaxPossibleWindowsPerRow
+    windows(i,:) = vec(i:(i + windowLength - 1));
+end
+[windows,iCol] = unique(windows,'stable','rows');
 end
