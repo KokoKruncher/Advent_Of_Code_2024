@@ -2,7 +2,7 @@ clear; clc;
 
 filename = "D22 Data.txt";
 secretNumbersInitial = readmatrix(filename);
-% secretNumbersInitial = [1; 2; 3; 20204];
+% secretNumbersInitial = [1; 2; 3; 2024];
 
 %% Part 1
 tic
@@ -22,31 +22,11 @@ prices = mod([secretNumbersInitial, secretNumbersEvolved],10);
 priceChanges = diff(prices,1,2);
 
 windowLength = 4;
-possibleWindows = createWindows(priceChanges,windowLength);
-
-nRows = height(priceChanges);
-nCols = width(priceChanges);
-nPossibleWindows = numel(possibleWindows);
-maxPrice = 0;
-sequenceMaxPrice = nan;
-for iWindow = 1:1000
-    % disp(iWindow)
-    window = possibleWindows{iWindow};
-    [thisWindowPrice,cannotBeMoreThanMax] = getPrice(window,prices,priceChanges,nRows, ...
-        windowLength,maxPrice);
-
-    if cannotBeMoreThanMax
-        continue
-    end
-    
-    if thisWindowPrice > maxPrice
-        maxPrice = thisWindowPrice;
-        sequenceMaxPrice = window;
-    end
-end
+windowScore = countWindowScore(priceChanges,prices,windowLength);
+maxBananas = max(windowScore.values);
 toc
 
-fprintf("Max bananas: %i\n",maxPrice)
+fprintf("Max bananas: %i\n",maxBananas)
 
 %% Functions
 function out = mix(secretNumber,value)
@@ -87,57 +67,36 @@ end
 
 
 
-function uniqueWindows = createWindows(priceChanges,windowLength)
+function windowScore = countWindowScore(priceChanges,prices,windowLength)
+firstWindow = priceChanges(1,1:windowLength);
+windowScore = dictionary({firstWindow},0);
+
 nRows = height(priceChanges);
 nCols = width(priceChanges);
 nMaxPossibleWindowsPerRow = (nCols - windowLength + 1);
-nMaxPossibleWindows = nMaxPossibleWindowsPerRow*nRows;
 
-possibleWindows = cell(1,nMaxPossibleWindows);
-iPossibleWindows = 1;
 for iRow = 1:nRows
     row = priceChanges(iRow,:);
+
+    windowsAlreadyChecked = dictionary({nan},true);
     for iCol = 1:nMaxPossibleWindowsPerRow
         window = row(iCol:(iCol + windowLength - 1));
-        possibleWindows{iPossibleWindows} = window;
-        iPossibleWindows = iPossibleWindows + 1;
+
+        if windowsAlreadyChecked.isKey({window})
+            continue
+        end
+        windowsAlreadyChecked({window}) = true;
+
+        % iCol + window length - 1 is col of last window element.
+        % + 1 because first column of price matrix doesnt have a corresponding price
+        % change.
+        thisPrice = prices(iRow,iCol + windowLength - 1 + 1);
+
+        if windowScore.isKey({window})
+            windowScore({window}) = windowScore({window}) + thisPrice;
+        else
+            windowScore({window}) = thisPrice;
+        end
     end
-end
-
-% find unique windows only (40k out of 4.5 mil -> 100x smaller)
-possibleWindows = vertcat(possibleWindows{:});
-uniqueWindows = unique(possibleWindows,'rows');
-
-% convert back to cell array
-uniqueWindows = mat2cell(uniqueWindows,ones(height(uniqueWindows),1),windowLength);
-end
-
-
-
-function [currentPrice,cannotBeMoreThanMax] = getPrice(window,prices,priceChanges, ...
-    nRows,windowLength,currentMaxPrice)
-indxFoundSequence = ismember(priceChanges,window);
-doesRowHaveSequence = any(indxFoundSequence,2);
-
-currentPrice = nan;
-cannotBeMoreThanMax = false;
-nRowsWithSequence = sum(doesRowHaveSequence);
-if (nRowsWithSequence*9) <= currentMaxPrice
-    cannotBeMoreThanMax = true;
-    return
-end
-
-currentPrice = 0;
-for iRow = 1:nRows
-    if ~doesRowHaveSequence(iRow)
-        continue
-    end
-    
-    thisRowIndxFoundSequence = indxFoundSequence(iRow,:);
-    locSequence = find(thisRowIndxFoundSequence,windowLength,"first");
-    locPrice = locSequence(end);
-    thisPrice = prices(locPrice + 1);
-    
-    currentPrice = currentPrice + thisPrice;
 end
 end
