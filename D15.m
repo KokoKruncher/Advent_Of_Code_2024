@@ -1,6 +1,6 @@
 clear; clc;
 
-filename = "D15 Data.txt";
+filename = "D15 Test Data.txt";
 data = readlines(filename);
 [originalGrid,instructions] = parseData(data);
 
@@ -38,11 +38,11 @@ initialLocationLinearIndx = find(newGrid == "@");
 
 newGrid(initialLocationLinearIndx) = ".";
 
-[newEndLocation, newGrid] = moveRobot(instructions, direction, location, newGrid);
+[newEndLocation,newGrid] = moveRobot(instructions,direction,location,newGrid,bPrint=false);
 
-newSumBoxGpsCoordinates = calculateSumGpsCoordinates2(newGrid);
+newSumBoxGpsCoordinates = calculateSumGpsCoordinates(newGrid,"[");
 
-fprintf("Sun of box GPS coordinates in new warehouse: %i\n",newSumBoxGpsCoordinates)
+fprintf("\nSum of box GPS coordinates in new warehouse: %i\n",newSumBoxGpsCoordinates)
 toc
 
 %% Functions
@@ -182,8 +182,10 @@ distanceFromBottomEdge = gridHeight - boxLocationsRight(:,1);
 distanceFromLeftEdge = boxLocationsLeft(:,2) - 1;
 distanceFromRightEdge = gridWidth - boxLocationsRight(:,2);
 
-distanceTopBottom = min(distanceFromTopEdge,distanceFromBottomEdge);
-distanceLeftRight = min(distanceFromLeftEdge,distanceFromRightEdge);
+% distanceTopBottom = min(distanceFromTopEdge,distanceFromBottomEdge);
+% distanceLeftRight = min(distanceFromLeftEdge,distanceFromRightEdge);
+distanceTopBottom = distanceFromTopEdge;
+distanceLeftRight = distanceFromLeftEdge;
 
 gpsCoordinates = (100*distanceTopBottom) + distanceLeftRight;
 sumGpsCoordinates = sum(gpsCoordinates,"all");
@@ -233,7 +235,29 @@ end
 
 
 
-function [location, grid] = moveRobot(instructions, direction, location, grid)
+function [location, grid] = moveRobot(instructions, direction, location, grid, args)
+arguments
+    instructions
+    direction
+    location
+    grid
+    args.bPrint (1,1) logical = false
+end
+bPrint = args.bPrint;
+gridWidth = width(grid);
+
+if bPrint
+    if ~isfolder("Outputs")
+        mkdir("Outputs");
+    end
+    filename = "Outputs/D15.txt";
+    iterationSeparator = repmat("-",[1 gridWidth]);
+
+    if isfile(filename)
+        delete(filename);
+    end
+end
+
 for instruction = instructions(:)'
     thisDirection = direction{instruction};
     [canMove,locationsToShift] = checkIfCanMove(location,thisDirection,grid,{});
@@ -245,6 +269,12 @@ for instruction = instructions(:)'
     location = location + thisDirection;
     if ~isempty(locationsToShift)
         grid = shiftBoxes(locationsToShift,thisDirection,grid);
+    end
+
+    if bPrint
+        gridToPrint = [grid; iterationSeparator];
+        gridToPrint(location(1),location(2)) = "@";
+        writematrix(gridToPrint,filename,"WriteMode","append");
     end
 end
 end
