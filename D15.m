@@ -1,6 +1,6 @@
 clear; clc;
 
-filename = "D15 Test Data.txt";
+filename = "D15 Data.txt";
 data = readlines(filename);
 [originalGrid,instructions] = parseData(data);
 
@@ -13,16 +13,12 @@ dirKeys = ["^" ">" "v" "<"];
 dirValues = {[-1 0], [0 1], [1 0], [0 -1]};
 direction = dictionary(dirKeys,dirValues);
 
+% replace initial location with free space to simplify operations
 initialLocationLinearIndx = find(grid == "@");
 [location(1),location(2)] = ind2sub(gridSize,initialLocationLinearIndx);
-
-% replace initial location with free space
 grid(initialLocationLinearIndx) = ".";
 
-% move the robot and boxes
 [endLocation, grid] = moveRobot(instructions, direction, location, grid);
-
-% calculate GPS coordinates of the boxes
 sumBoxGpsCoordinates = calculateSumGpsCoordinates(grid,"O");
 
 fprintf("Sum of box GPS coordinates: %i\n\n",sumBoxGpsCoordinates)
@@ -35,17 +31,61 @@ newGridSize = size(newGrid);
 
 initialLocationLinearIndx = find(newGrid == "@");
 [location(1),location(2)] = ind2sub(newGridSize,initialLocationLinearIndx);
-
 newGrid(initialLocationLinearIndx) = ".";
 
-[newEndLocation,newGrid] = moveRobot(instructions,direction,location,newGrid,bPrint=false);
-
+[newEndLocation,newGrid] = moveRobot(instructions,direction,location,newGrid);
 newSumBoxGpsCoordinates = calculateSumGpsCoordinates(newGrid,"[");
 
 fprintf("\nSum of box GPS coordinates in new warehouse: %i\n",newSumBoxGpsCoordinates)
 toc
 
 %% Functions
+function [location, grid] = moveRobot(instructions, direction, location, grid, args)
+arguments
+    instructions (:,1) string
+    direction (1,1) dictionary
+    location (1,2) double
+    grid (:,:) string
+    args.bPrint (1,1) logical = false
+end
+bPrint = args.bPrint;
+gridWidth = width(grid);
+
+if bPrint
+    if ~isfolder("Outputs")
+        mkdir("Outputs");
+    end
+    filename = "Outputs/D15.txt";
+    iterationSeparator = repmat("-",[1 gridWidth]);
+
+    if isfile(filename)
+        delete(filename);
+    end
+end
+
+for instruction = instructions(:)'
+    thisDirection = direction{instruction};
+    [canMove,locationsToShift] = checkIfCanMove(location,thisDirection,grid,{});
+    
+    if ~canMove
+        continue
+    end
+    
+    location = location + thisDirection;
+    if ~isempty(locationsToShift)
+        grid = shiftBoxes(locationsToShift,thisDirection,grid);
+    end
+
+    if bPrint
+        gridToPrint = [grid; iterationSeparator];
+        gridToPrint(location(1),location(2)) = "@";
+        writematrix(gridToPrint,filename,"WriteMode","append");
+    end
+end
+end
+
+
+
 function [canMove,locationsToShift] = checkIfCanMove(location,thisDirection,grid, ...
     locationsToShift)
 nextLocation = location + thisDirection;
@@ -125,13 +165,6 @@ end
 
 
 
-% function newDirection = rotate90DegClockwise(direction,n)
-% rotationMatrix = [0, 1; -1, 0];
-% newDirection = ((rotationMatrix^n)*(direction'))';
-% end
-
-
-
 function newGrid = shiftBoxes(locationsToShift,thisDirection,grid)
 nLocationsToShift = numel(locationsToShift);
 shiftedLocations = cellfun(@(x) x + thisDirection,locationsToShift,'UniformOutput',false);
@@ -167,32 +200,6 @@ end
 
 
 
-function sumGpsCoordinates = calculateSumGpsCoordinates2(grid)
-gridSize = size(grid);
-gridHeight = gridSize(1);
-gridWidth = gridSize(2);
-
-boxLocationsLeft = find(grid == "[");
-[boxLocationsLeft(:,1),boxLocationsLeft(:,2)] = ind2sub(gridSize,boxLocationsLeft);
-boxLocationsRight = boxLocationsLeft + [0 1];
-
-distanceFromTopEdge = boxLocationsRight(:,1) - 1;
-distanceFromBottomEdge = gridHeight - boxLocationsRight(:,1);
-
-distanceFromLeftEdge = boxLocationsLeft(:,2) - 1;
-distanceFromRightEdge = gridWidth - boxLocationsRight(:,2);
-
-% distanceTopBottom = min(distanceFromTopEdge,distanceFromBottomEdge);
-% distanceLeftRight = min(distanceFromLeftEdge,distanceFromRightEdge);
-distanceTopBottom = distanceFromTopEdge;
-distanceLeftRight = distanceFromLeftEdge;
-
-gpsCoordinates = (100*distanceTopBottom) + distanceLeftRight;
-sumGpsCoordinates = sum(gpsCoordinates,"all");
-end
-
-
-
 function newGrid = createNewGrid(grid,initialLocationLinearIndx)
 grid(initialLocationLinearIndx) = "@";
 newGrid = join(grid,"");
@@ -215,14 +222,6 @@ gridString = data(1:indxEmptyLine-1);
 gridString = split(gridString,"");
 gridString = gridString(:,2:end-1);
 
-% comparisons with strings is slow, so swicth to representing grid objects as numbers
-% gridSize = size(gridString);
-% grid = nan(gridSize);
-% grid(gridString == ".") = 0; % free space
-% grid(gridString == "O") = 1; % box
-% grid(gridString == "#") = 2; % wall
-% assert(~any(isnan(grid),"all"),"Grid has some nan values")
-
 % combine all instructions into one line
 instructionsString = data(indxEmptyLine+1:end);
 instructionsString = join(instructionsString,"");
@@ -231,50 +230,4 @@ instructionsString = instructionsString(instructionsString ~= "");
 
 grid = gridString;
 instructions = instructionsString;
-end
-
-
-
-function [location, grid] = moveRobot(instructions, direction, location, grid, args)
-arguments
-    instructions
-    direction
-    location
-    grid
-    args.bPrint (1,1) logical = false
-end
-bPrint = args.bPrint;
-gridWidth = width(grid);
-
-if bPrint
-    if ~isfolder("Outputs")
-        mkdir("Outputs");
-    end
-    filename = "Outputs/D15.txt";
-    iterationSeparator = repmat("-",[1 gridWidth]);
-
-    if isfile(filename)
-        delete(filename);
-    end
-end
-
-for instruction = instructions(:)'
-    thisDirection = direction{instruction};
-    [canMove,locationsToShift] = checkIfCanMove(location,thisDirection,grid,{});
-    
-    if ~canMove
-        continue
-    end
-    
-    location = location + thisDirection;
-    if ~isempty(locationsToShift)
-        grid = shiftBoxes(locationsToShift,thisDirection,grid);
-    end
-
-    if bPrint
-        gridToPrint = [grid; iterationSeparator];
-        gridToPrint(location(1),location(2)) = "@";
-        writematrix(gridToPrint,filename,"WriteMode","append");
-    end
-end
 end
