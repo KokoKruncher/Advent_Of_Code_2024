@@ -75,3 +75,23 @@ for iLinearIndx = 1:nIndxArrayElements
     a = d(indx);
 end
 toc
+
+%% isKey
+
+fprintf("\nisKey:\n\n")
+
+n = 1e6;
+
+disp("Map:")
+tic
+for i = 1:n
+    TF = map.isKey(i);
+end
+toc
+
+disp("Dictionary:")
+tic
+for i = 1:n
+    TF = d.isKey(i);
+end
+toc
