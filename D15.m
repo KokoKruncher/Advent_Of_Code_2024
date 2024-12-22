@@ -2,10 +2,11 @@ clear; clc;
 
 filename = "D15 Data.txt";
 data = readlines(filename);
-[grid,instructions] = parseData(data);
+[originalGrid,instructions] = parseData(data);
 
 %% Part 1
 tic
+grid = originalGrid;
 gridSize = size(grid);
 
 dirKeys = ["^" ">" "v" "<"];
@@ -19,28 +20,17 @@ initialLocationLinearIndx = find(grid == "@");
 grid(initialLocationLinearIndx) = ".";
 
 % move the robot and boxes
-for instruction = instructions(:)'
-    thisDirection = direction{instruction};
-    [canMove,locationsToShift] = checkIfCanMove(location,thisDirection,grid,{});
-
-    if ~canMove
-        continue
-    end
-    
-    location = location + thisDirection;
-    if ~isempty(locationsToShift)
-        grid = shift(locationsToShift,thisDirection,grid);
-    end
-end
+[endLocation, grid] = moveRobot(instructions, direction, location, grid);
 
 % calculate GPS coordinates of the boxes
 sumBoxGpsCoordinates = calculateSumGpsCoordinates(grid,"O");
 
-fprintf("Sum of box GPS coordinates: %i\n",sumBoxGpsCoordinates)
+fprintf("Sum of box GPS coordinates: %i\n\n",sumBoxGpsCoordinates)
 toc
 
 %% Part 2
-newGrid = createNewGrid(grid,initialLocationLinearIndx);
+tic
+newGrid = createNewGrid(originalGrid,initialLocationLinearIndx);
 newGridSize = size(newGrid);
 
 initialLocationLinearIndx = find(newGrid == "@");
@@ -48,10 +38,12 @@ initialLocationLinearIndx = find(newGrid == "@");
 
 newGrid(initialLocationLinearIndx) = ".";
 
-for instruction = instructions(:)'
-    thisDirection = direction{instruction};
-    [canMove,locationsToShift] = checkIfCanMove2(location,thisDirection,newGrid,{});
-end
+[newEndLocation, newGrid] = moveRobot(instructions, direction, location, newGrid);
+
+newSumBoxGpsCoordinates = calculateSumGpsCoordinates2(newGrid);
+
+fprintf("Sun of box GPS coordinates in new warehouse: %i\n",newSumBoxGpsCoordinates)
+toc
 
 %% Functions
 function [canMove,locationsToShift] = checkIfCanMove(location,thisDirection,grid, ...
@@ -68,7 +60,8 @@ elseif nextGridSpot == "O"
         grid,locationsToShift);
 elseif ismember(nextGridSpot,["[" "]"])
     % recursively check connected boxes
-    [locationsToShift,canMove] = checkConnectedBoxes(nextLocation,thisDirection,grid,nextGridSpot,{});
+    [locationsToShift,canMove] = checkConnectedBoxes(nextLocation,thisDirection,grid, ...
+        nextGridSpot,{});
 elseif nextGridSpot == "#"
     canMove = false;
 else
@@ -78,7 +71,8 @@ end
 
 
 
-function [boxLocations,canMove] = checkConnectedBoxes(location,robotDirection,grid,gridSpot,boxLocations)
+function [boxLocations,canMove] = checkConnectedBoxes(location,robotDirection,grid, ...
+    gridSpot,boxLocations)
 thisBoxLocations = {location};
 
 isRobotGoingEastWest = all(robotDirection == [0 1]) || all(robotDirection == [0 -1]);
@@ -99,7 +93,7 @@ boxLocations = [boxLocations, thisBoxLocations];
 
 % which locations ahead of box to check
 if isRobotGoingEastWest
-    locationsToCheck = {location + 2*thisDirection};
+    locationsToCheck = {location + 2*robotDirection};
 else
     locationsToCheck = cellfun(@(x) x + robotDirection,thisBoxLocations, ...
         'UniformOutput',false);
@@ -113,16 +107,19 @@ for i = 1:nLocationsToCheck
         break
     end
 
-    locationToCheck = locationsToCheck(i);
+    locationToCheck = locationsToCheck{i};
     gridSpotToCheck = grid(locationToCheck(1),locationToCheck(2));
     if ismember(gridSpotToCheck,["[" "]"])
         % recursively check all boxes ahead
-        [boxLocations,canMove] = checkConnectedBoxes(locationToCheck,robotDirection,grid,gridSpotToCheck,boxLocations);
+        [boxLocations,canMove] = checkConnectedBoxes(locationToCheck,robotDirection, ...
+            grid,gridSpotToCheck,boxLocations);
         continue
     end
     
-    % if not a box, check if wall or free space
-    [canMove,~] = checkIfCanMove(locationToCheck,robotDirection,grid,boxLocations);
+    % if not a box, check if wall or free space, input previous location to check this
+    % location
+    [canMove,~] = checkIfCanMove(locationToCheck - robotDirection, ...
+        robotDirection,grid,boxLocations);
 end
 end
 
@@ -135,18 +132,24 @@ end
 
 
 
-function grid = shift(locationsToShift,thisDirection,grid)
+function newGrid = shiftBoxes(locationsToShift,thisDirection,grid)
 nLocationsToShift = numel(locationsToShift);
+shiftedLocations = cellfun(@(x) x + thisDirection,locationsToShift,'UniformOutput',false);
 
-% make 1st location into free space
-firstLocation = locationsToShift{1};
-grid(firstLocation(1),firstLocation(2)) = ".";
-
-% shift boxes by setting all grid spots at new locations to "O"
-for i = nLocationsToShift
+% clear out all box locations on new grid first
+newGrid = grid;
+for i = 1:nLocationsToShift
     thisLocation = locationsToShift{i};
-    nextLocation = thisLocation + thisDirection;
-    grid(nextLocation(1),nextLocation(2)) = "O";
+    newGrid(thisLocation(1),thisLocation(2)) = ".";
+end
+
+% copy shifted box locations onto new grid
+for i = 1:nLocationsToShift
+    thisLocation = locationsToShift{i};
+    nextLocation = shiftedLocations{i};
+
+    thisBox = grid(thisLocation(1),thisLocation(2));
+    newGrid(nextLocation(1),nextLocation(2)) = thisBox;
 end
 end
 
@@ -159,6 +162,30 @@ locationsLinearIndx = find(grid == gridType);
 distancesFromTopEdge = rows - 1;
 distancesFromLeftEdge = cols - 1;
 gpsCoordinates = (100*distancesFromTopEdge) + distancesFromLeftEdge;
+sumGpsCoordinates = sum(gpsCoordinates,"all");
+end
+
+
+
+function sumGpsCoordinates = calculateSumGpsCoordinates2(grid)
+gridSize = size(grid);
+gridHeight = gridSize(1);
+gridWidth = gridSize(2);
+
+boxLocationsLeft = find(grid == "[");
+[boxLocationsLeft(:,1),boxLocationsLeft(:,2)] = ind2sub(gridSize,boxLocationsLeft);
+boxLocationsRight = boxLocationsLeft + [0 1];
+
+distanceFromTopEdge = boxLocationsRight(:,1) - 1;
+distanceFromBottomEdge = gridHeight - boxLocationsRight(:,1);
+
+distanceFromLeftEdge = boxLocationsLeft(:,2) - 1;
+distanceFromRightEdge = gridWidth - boxLocationsRight(:,2);
+
+distanceTopBottom = min(distanceFromTopEdge,distanceFromBottomEdge);
+distanceLeftRight = min(distanceFromLeftEdge,distanceFromRightEdge);
+
+gpsCoordinates = (100*distanceTopBottom) + distanceLeftRight;
 sumGpsCoordinates = sum(gpsCoordinates,"all");
 end
 
@@ -202,4 +229,22 @@ instructionsString = instructionsString(instructionsString ~= "");
 
 grid = gridString;
 instructions = instructionsString;
+end
+
+
+
+function [location, grid] = moveRobot(instructions, direction, location, grid)
+for instruction = instructions(:)'
+    thisDirection = direction{instruction};
+    [canMove,locationsToShift] = checkIfCanMove(location,thisDirection,grid,{});
+    
+    if ~canMove
+        continue
+    end
+    
+    location = location + thisDirection;
+    if ~isempty(locationsToShift)
+        grid = shiftBoxes(locationsToShift,thisDirection,grid);
+    end
+end
 end
