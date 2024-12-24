@@ -25,7 +25,12 @@ tic
 nNodes = numel(localNetwork.Nodes.Name);
 dInterconnectingNodes = configureDictionary('double','cell');
 maxNumInterconnectingNodes = 0;
+lanPartyComputersCurrentGuess = [];
 for iNode = 1:nNodes
+    if any(lanPartyComputersCurrentGuess == iNode)
+        continue
+    end
+
     dInterconnectingNodes{iNode} = iNode;
     [dInterconnectingNodes,~] = searchForInterconnectingNodes(localNetwork, ...
         dInterconnectingNodes,iNode,iNode);
@@ -34,6 +39,7 @@ for iNode = 1:nNodes
     if nInterconnectingNodes > maxNumInterconnectingNodes
         maxNumInterconnectingNodes = nInterconnectingNodes;
         iLargestInterconnectingNetwork = iNode;
+        lanPartyComputersCurrentGuess = dInterconnectingNodes{iNode};
     end
 end
 lanPartyComputers = dInterconnectingNodes{iLargestInterconnectingNetwork};
