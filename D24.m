@@ -77,7 +77,7 @@ end
 
 wireNetwork = digraph(source,target,[],uniqueWires);
 % figure
-% wireNetwork.plot();
+% wireNetwork.plot('Layout','layered');
 
 nodeOrder = toposort(wireNetwork);
 end
