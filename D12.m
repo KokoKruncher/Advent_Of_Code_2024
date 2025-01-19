@@ -135,8 +135,11 @@ nodeDegrees = regionSidesGraph.degree();
 degreeOfNodeId = dictionary(1:nNodes,nodeDegrees');
 sourceNodeDegrees = degreeOfNodeId(sourceNodes);
 targetNodeDegrees = degreeOfNodeId(targetNodes);
-isEdgeToNodesOfDegree3 = targetNodeDegrees == 3 & sourceNodeDegrees == 3;
-iEdgeToNodesOfDegree3 = find(isEdgeToNodesOfDegree3);
+cond1 = targetNodeDegrees == 3 & sourceNodeDegrees == 3;
+cond2 = targetNodeDegrees == 3 & sourceNodeDegrees == 4;
+cond3 = targetNodeDegrees == 4 & sourceNodeDegrees == 3;
+isEdgeToNodesOfDegree3OrDegree3And4 = cond1 | cond2 | cond3;
+iEdgeToNodesOfDegree3 = find(isEdgeToNodesOfDegree3OrDegree3And4);
 
 isInternalEdge = ismember(oneBlockCycleEdges,iEdgeToNodesOfDegree3);
 
