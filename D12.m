@@ -35,7 +35,7 @@ totalFencePrice = sum(fencePrices);
 fprintf("Total fence price: %i\n",totalFencePrice)
 
 %% Part 2
-nSides = nan(nRegions,1);
+nSidesInRegion = nan(nRegions,1);
 for iRegion = 1:nRegions
     isNodeInRegion = nodeRegionIndx == iRegion;
 
@@ -71,27 +71,45 @@ for iRegion = 1:nRegions
     nDirectionChanges = nan(nCycles,1);
     for iCycle = 1:nCycles
         thisCycle = allCycles{iCycle};
-        coords = [regionSidesGraph.Nodes.iRow(thisCycle), ...
-            regionSidesGraph.Nodes.iCol(thisCycle)];
+        
+        % important to include the final move back to the first node as that can have a
+        % change in direction too
+        nodesInLoop = [thisCycle,thisCycle(1)];
+        coords = [regionSidesGraph.Nodes.iRow(nodesInLoop), ...
+            regionSidesGraph.Nodes.iCol(nodesInLoop)];
         directions = diff(coords,1,1);
         differenceToPreviousDirection = diff(directions,1,1);
         isDirectionChange = any(differenceToPreviousDirection ~= 0, 2);
-        nDirectionChanges(iCycle) = nnz(isDirectionChange);
+        nDirectionChanges(iCycle) = nnz(isDirectionChange) + 1; % add initial direction
+
+        % if iRegion == 11
+        %     displ ay(directions)
+        %     display(differenceToPreviousDirection)
+        % end
     end
-    nSides(iRegion) = sum(nDirectionChanges);
+    nSidesInRegion(iRegion) = sum(nDirectionChanges);
+
+    figure
+    x = vertexGraph.Nodes.iCol;
+    y = vertexGraph.Nodes.iRow;
+    plot(vertexGraph,'XData',x,'YData',y)
+
+    iLetter = find(nodeRegionIndx == iRegion,1,"first");
+    letter = gardenGraph.Nodes.letter(iLetter);
+    figure
+    x = regionSidesGraph.Nodes.iCol;
+    y = regionSidesGraph.Nodes.iRow;
+    plot(regionSidesGraph,'XData',x,'YData',y)
+    title(letter)
 end
 
-figure
-x = vertexGraph.Nodes.iCol;
-y = vertexGraph.Nodes.iRow;
-z = zeros(size(x));
-plot(vertexGraph,'XData',x,'YData',y)
+fencePrices2 = nSidesInRegion(:).*regionAreas(:);
+totalFencePrice2 = sum(fencePrices2);
 
-figure
-x = regionSidesGraph.Nodes.iCol;
-y = regionSidesGraph.Nodes.iRow;
-z = zeros(size(x));
-plot(regionSidesGraph,'XData',x,'YData',y)
+fprintf("Total fence price 2: %i\n",totalFencePrice2)
+
+
+
 %% Functions
 function plotRegionAndVertices(iRowRegion,iColRegion,iRowVertex,iColVertex)
 iRowRegion = iRowRegion - min(iRowRegion) + 1 + 0.5;
@@ -118,35 +136,86 @@ end
 
 
 function regionSidesGraph = removeLastInternalEdges(regionSidesGraph)
-[~,allCycleEdges] = regionSidesGraph.allcycles();
-isOneBlockCycle = cellfun(@numel,allCycleEdges) == 4;
+[allCycleNodes,allCycleEdges] = regionSidesGraph.allcycles();
+nCycles = numel(allCycleEdges);
 
-if ~any(isOneBlockCycle)
+if nCycles == 1
     return
 end
 
+cycleSizes = cellfun(@numel,allCycleEdges);
+if any(cycleSizes < 4)
+    error("Encountered cycle with less than 4 edges")
+end
+
+[~,iLargestCycle] = max(cycleSizes);
+edgesLargestCycle = allCycleEdges{iLargestCycle};
+
+isOneBlockCycle = cycleSizes == 4;
 oneBlockCycleEdges = allCycleEdges(isOneBlockCycle);
-oneBlockCycleEdges = [oneBlockCycleEdges{:}]; % concat into one row vector
+oneBlockCycleNodes = allCycleNodes(isOneBlockCycle);
 
 nNodes = regionSidesGraph.numnodes;
-sourceNodes = regionSidesGraph.Edges.EndNodes(:,1);
-targetNodes = regionSidesGraph.Edges.EndNodes(:,2);
 nodeDegrees = regionSidesGraph.degree();
 degreeOfNodeId = dictionary(1:nNodes,nodeDegrees');
-sourceNodeDegrees = degreeOfNodeId(sourceNodes);
-targetNodeDegrees = degreeOfNodeId(targetNodes);
-cond1 = targetNodeDegrees == 3 & sourceNodeDegrees == 3;
-cond2 = targetNodeDegrees == 3 & sourceNodeDegrees == 4;
-cond3 = targetNodeDegrees == 4 & sourceNodeDegrees == 3;
-isEdgeToNodesOfDegree3OrDegree3And4 = cond1 | cond2 | cond3;
-iEdgeToNodesOfDegree3 = find(isEdgeToNodesOfDegree3OrDegree3And4);
 
-isInternalEdge = ismember(oneBlockCycleEdges,iEdgeToNodesOfDegree3);
+nOneBlockCycles = nnz(isOneBlockCycle);
+isInsideEdgeOfRegion = false(nOneBlockCycles,1);
+for i = 1:nOneBlockCycles
+    thisCycleNodes = oneBlockCycleNodes{i};
+    thisCycleNodeDegrees = degreeOfNodeId(thisCycleNodes);
+    
+    if all(thisCycleNodeDegrees == 2)
+        isInsideEdgeOfRegion(i) = true;
+    end
+end
+nInsideEdgesOfRegion = nnz(isInsideEdgeOfRegion);
 
-if ~any(isInternalEdge)
-    return
+if nInsideEdgesOfRegion > 1
+    error("Detected %i inside edges of region. Max should be 1",nInsideEdgesOfRegion)
 end
 
-internalEdges = oneBlockCycleEdges(isInternalEdge);
-regionSidesGraph = regionSidesGraph.rmedge(internalEdges);
+if any(isInsideEdgeOfRegion)
+    edgesInsideEdgeOfRegion = oneBlockCycleEdges{isInsideEdgeOfRegion};
+else
+    edgesInsideEdgeOfRegion = [];
+end
+
+validEdges = [edgesLargestCycle(:); edgesInsideEdgeOfRegion(:)];
+
+nEdgesInitial = regionSidesGraph.numedges;
+allEdgesInitial = 1:nEdgesInitial;
+edgesToRemove = setdiff(allEdgesInitial,validEdges);
+regionSidesGraph = regionSidesGraph.rmedge(edgesToRemove);
+
+% isOneBlockCycle = cellfun(@numel,allCycleEdges) == 4;
+% 
+% if ~any(isOneBlockCycle)
+%     return
+% end
+% 
+% oneBlockCycleEdges = allCycleEdges(isOneBlockCycle);
+% oneBlockCycleEdges = [oneBlockCycleEdges{:}]; % concat into one row vector
+% 
+% nNodes = regionSidesGraph.numnodes;
+% sourceNodes = regionSidesGraph.Edges.EndNodes(:,1);
+% targetNodes = regionSidesGraph.Edges.EndNodes(:,2);
+% nodeDegrees = regionSidesGraph.degree();
+% degreeOfNodeId = dictionary(1:nNodes,nodeDegrees');
+% sourceNodeDegrees = degreeOfNodeId(sourceNodes);
+% targetNodeDegrees = degreeOfNodeId(targetNodes);
+% cond1 = targetNodeDegrees == 3 & sourceNodeDegrees == 3;
+% cond2 = targetNodeDegrees == 3 & sourceNodeDegrees == 4;
+% cond3 = targetNodeDegrees == 4 & sourceNodeDegrees == 3;
+% isEdgeToNodesOfDegree3OrDegree3And4 = cond1 | cond2 | cond3;
+% iEdgeToNodesOfDegree3 = find(isEdgeToNodesOfDegree3OrDegree3And4);
+% 
+% isInternalEdge = ismember(oneBlockCycleEdges,iEdgeToNodesOfDegree3);
+% 
+% if ~any(isInternalEdge)
+%     return
+% end
+% 
+% internalEdges = oneBlockCycleEdges(isInternalEdge);
+% regionSidesGraph = regionSidesGraph.rmedge(internalEdges);
 end
