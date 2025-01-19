@@ -1,4 +1,4 @@
-clear; clc;
+clear; clc; close all
 
 %% Part 1
 filename = "D12 Data.txt";
@@ -16,38 +16,7 @@ input = ["RRRRIICCFF"; ...
 
 gardenMap = parseInput(input);
 
-% create node table to ensure that nodes without edges (area = 1) are accounted for
-nPlots = numel(gardenMap);
-nodeTable = table();
-nodeTable.letter = gardenMap(:);
-
-edgeTable = table();
-edgeTable.EndNodes = nan(2*nPlots,2);
-gardenWidth = width(gardenMap);
-gardenHeight = height(gardenMap);
-iNode = 0;
-iEdge = 0;
-for iWidth = 1:gardenWidth
-    for iHeight = 1:gardenHeight
-        % only need to search down and right
-        letter = gardenMap(iHeight,iWidth);
-        iNode = iNode + 1;
-
-        if iHeight < gardenHeight && gardenMap(iHeight+1,iWidth) == letter
-            iNodeDown = iNode + 1;
-            iEdge = iEdge + 1;
-            edgeTable{iEdge,:} = [iNode, iNodeDown];
-        end
-
-        if iWidth < gardenWidth && gardenMap(iHeight,iWidth+1) == letter
-            iNodeRight = sub2ind([gardenHeight,gardenWidth],iHeight,iWidth+1);
-            iEdge = iEdge + 1;
-            edgeTable{iEdge,:} = [iNode, iNodeRight];
-        end
-    end
-end
-edgeTable = edgeTable(~any(isnan(edgeTable.EndNodes),2),:);
-gardenGraph = graph(edgeTable,nodeTable);
+gardenGraph = mapToGraph(gardenMap);
 
 % each node starts off with a perimiter of 4 (1 on each side). every new edge decreases
 % its perimeter by 1.
@@ -65,8 +34,28 @@ totalFencePrice = sum(fencePrices);
 
 fprintf("Total fence price: %i\n",totalFencePrice)
 
-%%
-% 
+%% Part 2
+% get vertex locations for each region and make a graph. side nodes are nodes that have
+% degree of exactly 2. graph can have up to 2 components, 1 for outer fence and one for
+% inner fence if it exists. DFS each component, add a side when direction changes.
+
+for iRegion = 1:1
+    isNodeInRegion = nodeRegionIndx == iRegion;
+    regionNodes = gardenGraph.Nodes(isNodeInRegion,:);
+    [vertexRows,vertexCols] = gridIndxToVertex(regionNodes.iRow,regionNodes.iCol);
+    vertexGraph = createVertexGraph(vertexRows,vertexCols);
+    
+    % vertices on the side (outside or inside if it exists) have degree less than 4
+    isSideVertex = vertexGraph.degree < 4;
+    nVertices = vertexGraph.numnodes;
+    allVertices = 1:nVertices;
+    sideGraph = vertexGraph.rmnode(allVertices(~isSideVertex));
+end
+figure
+x = vertexGraph.Nodes.iCol;
+y = vertexGraph.Nodes.iRow;
+z = zeros(size(x));
+plot(vertexGraph,'XData',x,'YData',y)
 %% Functions
 function gardenMap = parseInput(input)
 gardenMap = split(input,"");
