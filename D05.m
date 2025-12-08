@@ -32,12 +32,14 @@ nFreshIngredients = nnz(isFresh);
 fprintf("Number of fresh ingredients = %i\n", nFreshIngredients);
 
 %% Part 2
+
+% Ranges need to be sorted so that in the case where a range is fully within another range, it can be detected, as whis
+% algorithm checks whether the current range is within a previously handled range, but does not check whether previously
+% handled ranges are in range of the current range
+freshIdRanges = sortrows(freshIdRanges);
 nRanges = height(freshIdRanges);
-% freshIdRanges = sortrows(freshIdRanges);
 rangeMin = freshIdRanges(:,1);
 rangeMax = freshIdRanges(:,2);
-
-originalRanges = freshIdRanges;
 
 for ii = 2:nRanges
     [isMinSeen, iMinSeen] = isWithin(rangeMin(ii), freshIdRanges(1:ii-1,:));
@@ -55,43 +57,6 @@ end
 nFreshIds = sum(freshIdRanges(:,2) - freshIdRanges(:,1) + 1, "omitnan");
 
 fprintf("Number of fresh ingredient IDs = %i\n", nFreshIds);
-
-%% Check
-newRanges = freshIdRanges(~isnan(freshIdRanges(:,1)),:);
-for ii = 1:nRanges
-    assert(isWithin(originalRanges(ii,1), newRanges), "Min range %i is not found anymore", ii)
-    assert(isWithin(originalRanges(ii,2), newRanges), "Max range %i is not found anymore", ii)
-
-    % assert(~isWithin(originalRanges(ii,1) - 1, newRanges), "Min range - 1 %i is now found.", ii)
-    % assert(~isWithin(originalRanges(ii,2) + 1, newRanges), "Max range + 1 %i is now found.", ii)
-end
-disp("OK")
-
-%%%%% Found error %%%%%
-% This algorithm can handle the case where the current range is fully within a range that came before it, but doesn't
-% check that a range before is fully within the current range!
-for ii = 2:height(freshIdRanges)
-
-    if isnan(freshIdRanges(ii,1))
-        continue
-    end
-
-    mask = true(height(freshIdRanges), 1);
-    mask(ii) = false;
-
-    [bWithin, iWithin] = isWithin(freshIdRanges(ii,1), freshIdRanges);
-    if bWithin && any(iWithin ~= ii)
-        iWithin = iWithin(iWithin ~= ii);
-        error("Min range %i is duplicated. Found within range at row %i", ii, iWithin)
-    end
-
-    [bWithin, iWithin] = isWithin(freshIdRanges(ii,2), freshIdRanges);
-    if bWithin && any(iWithin ~= ii)
-        Within = iWithin(iWithin ~= ii);
-        error("Max range %i is duplicated. Found within range at row %i", ii, iWithin)
-    end
-end
-disp("OK")
 
 %% Functions
 function [TF, iWithin] = isWithin(num, ranges)
