@@ -16,7 +16,42 @@ pairs = nchoosek(1:nCandidates, 2);
 areas = squareAreas(candidates(pairs(:,1),:), candidates(pairs(:,2),:));
 maxArea = max(areas);
 
-fprintf("Max area = %i\n", maxArea);
+fprintf("Max area, part 1 = %i\n", maxArea);
+
+%% Part 2
+tic
+
+boundaryShape = polyshape(coords(:,1), coords(:,2));
+
+nCoords = height(coords);
+pairs = nchoosek(1:nCoords, 2);
+startCorners = coords(pairs(:,1),:);
+endCorners = coords(pairs(:,2),:);
+areas = squareAreas(startCorners, endCorners);
+
+% S, SV, E, EV
+allCornersX = [startCorners(:,1), startCorners(:,1), endCorners(:,1), endCorners(:,1)];
+allCornersY = [startCorners(:,2), endCorners(:,2), endCorners(:,2), startCorners(:,2)];
+nSquares = height(pairs);
+
+% Ignore warnings about empty polyshapes.
+% Can't be arsed to use vertex coordinates instead of center coordinates to make lines have > 0 area.
+% Heuristic based on plotting the boundary is that these lines won't be the solution for maximum area anyway.
+warning("off");
+for ii = nSquares:-1:1
+    squares(ii) = polyshape(allCornersX(ii,:), allCornersY(ii,:));
+end
+warning("on");
+
+nonIntersectingArea = squares.xor(boundaryShape);
+areaOutsideBoundary = nonIntersectingArea.subtract(boundaryShape);
+nRegionsOutsideBoundary = [areaOutsideBoundary.NumRegions];
+isWithinBoundary = nRegionsOutsideBoundary == 0;
+maxArea = max(areas(isWithinBoundary));
+
+toc
+
+fprintf("Max area, part 2 = %i\n", maxArea);
 
 %% Functions
 function areas = squareAreas(startCorners, endCorners)
