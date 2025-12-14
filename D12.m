@@ -4,6 +4,9 @@ inputText = readlines("D12_Data.txt");
 [Presents, Regions] = parseInput(inputText);
 
 %% Part 1
+% Reference:
+% https://youtu.be/DHtNCDnwOLA?si=JVmJ07XRVZuQVtmk
+
 nRegions = numel(Regions);
 for ii = 1:nRegions
     Regions(ii).isFailed = false;
@@ -33,6 +36,8 @@ if nRegionsToBeSolved == 0
 else
     fprintf("Need to solve %i regions\n", nRegionsToBeSolved);
 end
+
+%% (NO PART 2)
 
 %% Functions
 function [Presents, Regions] = parseInput(inputText)
