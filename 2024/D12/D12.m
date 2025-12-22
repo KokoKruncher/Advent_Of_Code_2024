@@ -5,9 +5,11 @@ filename = "D12 Data.txt";
 input = readlines(filename);
 
 gardenMap = parseInput(input);
-neighbours = constructGraph(gardenMap);
 
+tic
+neighbours = constructGraph(gardenMap);
 components = analyseComponents(gardenMap, neighbours);
+toc
 
 componentIds = 1:components.numEntries;
 totalPrice1 = sum([components(componentIds).area] .* [components(componentIds).perimeter]);
@@ -109,7 +111,6 @@ directions = [1, 0; ...
              0, -1; ...
              -1, 0; ...
              0, 1];
-nDirections = height(directions);
 
 mapWidth = width(gardenMap);
 mapHeight = height(gardenMap);
@@ -121,49 +122,30 @@ for index = 1:nElements
     letter = gardenMap(index);
     position = toSubscripts(index);
 
-    for iDirection = 1:nDirections
-        newPosition = position + directions(iDirection,:);
-        if ~isInBounds(newPosition)
-            continue
-        end
+    newPositions = position + directions;
+    newPositions = newPositions(isInBounds(newPositions),:);
+    newIndices = toLinearIndices(newPositions);
+    newLetters = gardenMap(newIndices);
 
-        newLetter = gardenMap(newPosition(1), newPosition(2));
-        if newLetter ~= letter
-            continue
-        end
-        
-        newIndex = toLinearIndex(newPosition);
-        if neighbours.isKey(index)
-            neighbours{index}(end+1) = newIndex;
-        else
-            neighbours{index} = newIndex;
-        end
-    end
+    neighbours{index} = newIndices(newLetters == letter);
 end
 
 % Nested functions
     function subscripts = toSubscripts(linearIndex)
-        [row, col] = ind2sub(mapSize, linearIndex);
-        subscripts = [row, col];
+        [rows, cols] = ind2sub(mapSize, linearIndex);
+        subscripts = [rows, cols];
     end
 
 
-    function linearIndex = toLinearIndex(subscripts)
-        linearIndex = sub2ind(mapSize, subscripts(1), subscripts(2));
+    function linearIndices = toLinearIndices(subscripts)
+        linearIndices = sub2ind(mapSize, subscripts(:,1), subscripts(:,2));
     end
 
 
     function tf = isInBounds(subscripts)
-        tf = false;
+        rows = subscripts(:,1);
+        cols = subscripts(:,2);
 
-        if subscripts(1) < 1 || subscripts(1) > mapHeight
-            return
-        end
-
-        if subscripts(2) < 1 || subscripts(2) > mapWidth
-            return
-        end
-
-        tf = true;
+        tf = rows >= 1 & rows <= mapHeight & cols >=1 & cols <= mapWidth;
     end
 end
