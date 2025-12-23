@@ -36,21 +36,27 @@ safetyFactor = inQuadrant1 * inQuadrant2 * inQuadrant3 * inQuadrant4;
 fprintf("Safety factor = %i\n", safetyFactor);
 
 %% Part 2
-% Heuristic: To form a christmas tree, each row will either have 0 or 1 contiguous blocks that have a robot.
+% Heuristic: To form a christmas tree, >50% of the grid will have robots with other robots on all sides.
+THRESHOLD_FRACTION = 0.5;
+kernel = ones(3,3);
+nPossiblePositions = WIDTH * HEIGHT;
 positions = initialPositions;
 nSeconds = 0;
 foundTree = false;
-while nSeconds <= 1e6
+tic
+while nSeconds <= 1e7
     nSeconds = nSeconds + 1;
     positions = mod(positions + velocities, [WIDTH; HEIGHT]);
     robotMap = createRobotMap(positions, WIDTH, HEIGHT);
 
-    isTree = all(sum(diff(robotMap, 1, 2) ~= 0, 2) <= 2);
+    % isTree = all(sum(diff(robotMap, 1, 2) ~= 0, 2) <= 2);
+    isTree = (nnz(conv2(robotMap, kernel, "same") == 9) / nPossiblePositions) > THRESHOLD_FRACTION;
     if isTree
         foundTree = true;
         break
     end
 end
+toc
 
 % filePath = "Outputs/D14_Part2.txt";
 % [fid, errorMessage] = fopen(filePath, 'w+');
