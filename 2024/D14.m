@@ -36,10 +36,10 @@ safetyFactor = inQuadrant1 * inQuadrant2 * inQuadrant3 * inQuadrant4;
 fprintf("Safety factor = %i\n", safetyFactor);
 
 %% Part 2
-% Heuristic: To form a christmas tree, >50% of the grid will have robots with other robots on all sides.
-THRESHOLD_FRACTION = 0.5;
-kernel = ones(3,3);
-nPossiblePositions = WIDTH * HEIGHT;
+% Fuck it, look look for 15 robots lined up in a row, vertically
+THRESHOLD = 15;
+kernel = ones(THRESHOLD, 1);
+% nPossiblePositions = WIDTH * HEIGHT;
 positions = initialPositions;
 nSeconds = 0;
 foundTree = false;
@@ -49,8 +49,9 @@ while nSeconds <= 1e7
     positions = mod(positions + velocities, [WIDTH; HEIGHT]);
     robotMap = createRobotMap(positions, WIDTH, HEIGHT);
 
-    % isTree = all(sum(diff(robotMap, 1, 2) ~= 0, 2) <= 2);
-    isTree = (nnz(conv2(robotMap, kernel, "same") == 9) / nPossiblePositions) > THRESHOLD_FRACTION;
+    robotMap = robotMap(:);
+    convolution = conv2(robotMap, kernel);
+    isTree = nnz(convolution == THRESHOLD) > 0;
     if isTree
         foundTree = true;
         break
@@ -58,23 +59,22 @@ while nSeconds <= 1e7
 end
 toc
 
-% filePath = "Outputs/D14_Part2.txt";
-% [fid, errorMessage] = fopen(filePath, 'w+');
-% cleanupObj = onCleanup(@() fclose(fid));
-% 
-% if fid == -1
-%     error("Couldn't open file!\nError Message: %s", errorMessage)
-% end
-% 
-% positions = initialPositions;
-% for nSeconds = 1:SECONDS_PART_2
-%     positions = mod(positions + velocities, [WIDTH; HEIGHT]);
-% 
-%     robotMap = createVisualMap(positions, WIDTH, HEIGHT);
-%     fprintf(fid, "t = %i:\n\n", nSeconds);
-%     fprintf(fid, "%s\n\n", robotMap);
-% end
-% fclose(fid);
+if foundTree
+    filePath = "Outputs/D14_Part2.txt";
+    fprintf("Found potential christmas tree at %is. Outputting to file: %s\n", nSeconds, filePath);
+
+    [fid, errorMessage] = fopen(filePath, 'w+');
+    cleanupObj = onCleanup(@() fclose(fid));
+
+    if fid == -1
+        error("Couldn't open file!\nError Message: %s", errorMessage)
+    end
+
+    robotMap = createVisualMap(positions, WIDTH, HEIGHT);
+    fprintf(fid, "t = %i:\n\n", nSeconds);
+    fprintf(fid, "%s\n\n", robotMap);
+end
+clear cleanupObj
 
 %% Functions
 function robotMap = createRobotMap(positions, WIDTH, HEIGHT)
